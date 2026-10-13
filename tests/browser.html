@@ -1,0 +1,18 @@
+<!doctype html><html><head><title>Ninja Lab — browser verification</title></head><body style="background:#111;color:#ddd;font:15px monospace"><h1>Local browser verification</h1><pre id="results">Loading pinned MediaPipe models…</pre><canvas id="input" width="640" height="480"></canvas><canvas id="output" width="640" height="480"></canvas><script type="module">
+import {FilesetResolver,HandLandmarker,FaceLandmarker,ImageSegmenter} from '/vendor/vision_bundle.mjs';
+import {Effects} from '/effects.js';
+const results=document.querySelector('#results'),lines=[];
+function report(s){lines.push(s);results.textContent=lines.join('\n');}
+const tasks=[];
+try{
+  const vision=await FilesetResolver.forVisionTasks('/vendor/wasm');report('PASS: WASM fileset resolves');
+  const input=document.querySelector('#input'),ctx=input.getContext('2d');ctx.fillStyle='#555';ctx.fillRect(0,0,640,480);ctx.fillStyle='#cba';ctx.beginPath();ctx.ellipse(320,190,65,90,0,0,Math.PI*2);ctx.fill();
+  async function make(Type,file,options){try{return await Type.createFromOptions(vision,{baseOptions:{modelAssetPath:'/models/'+file,delegate:'GPU'},...options});}catch(e){report('INFO: GPU fallback '+e.message);return await Type.createFromOptions(vision,{baseOptions:{modelAssetPath:'/models/'+file,delegate:'CPU'},...options});}}
+  const hand=await make(HandLandmarker,'hand_landmarker.task',{runningMode:'VIDEO',numHands:2});tasks.push(hand);const hr=hand.detectForVideo(input,performance.now());if(!hr.landmarks)throw Error('Invalid hand result');report('PASS: HandLandmarker creates and runs inference');
+  const face=await make(FaceLandmarker,'face_landmarker.task',{runningMode:'VIDEO',numFaces:1});tasks.push(face);const fr=face.detectForVideo(input,performance.now());if(!fr.faceLandmarks)throw Error('Invalid face result');report('PASS: FaceLandmarker creates and runs inference');
+  const seg=await make(ImageSegmenter,'selfie_segmenter.tflite',{runningMode:'IMAGE',outputConfidenceMasks:true,outputCategoryMask:false});tasks.push(seg);seg.segment(input,r=>{const m=r.confidenceMasks[0],values=m.getAsFloat32Array();if(!values.length||values.some(v=>!Number.isFinite(v)))throw Error('Invalid mask');report('PASS: ImageSegmenter runs; foreground mask '+m.width+'×'+m.height);});
+  const output=document.querySelector('#output'),fx=new Effects(output);
+  for(const id of ['fire','clone','lightning']){fx.start(id,0,true);fx.draw(null,null,[],500);const p=output.getContext('2d').getImageData(0,0,640,480);if(!p.data.some((v,i)=>i%4===3&&v))throw Error('Empty '+id+' effect');report('PASS: '+id+' demo renders pixels');}
+  fx.draw(null,null,[],7000);if(fx.active)throw Error('Effect did not end');report('PASS: effects expire at 6 seconds');report('ALL BROWSER CHECKS PASSED');
+}catch(e){report('FAIL: '+e.message);console.error(e);}finally{tasks.forEach(t=>t.close());}
+</script></body></html>
