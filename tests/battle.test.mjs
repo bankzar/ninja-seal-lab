@@ -1,0 +1,25 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Battle,MotionDetector,SKILLS} from '../dist/battle.js';
+
+test('battle starts with full resources; skills subtract exact MP and enemy HP',()=>{const b=new Battle();b.start(0);const hit=b.useSkill('fire');assert.equal(hit.ok,true);assert.equal(b.mp,65);assert.equal(b.enemyHp,296);});
+test('MP regenerates five per whole active second and never exceeds 100',()=>{const b=new Battle();b.start(0);b.useSkill('fire');b.tick(999);assert.equal(b.mp,65);b.tick(1000);assert.equal(b.mp,70);b.tick(3000);assert.equal(b.mp,80);b.tick(20000);assert.equal(b.mp,100);});
+test('an unaffordable jutsu changes neither MP nor enemy HP',()=>{const b=new Battle();b.start(0);b.mp=20;const hp=b.enemyHp;assert.deepEqual(b.useSkill('lightning'),{ok:false,reason:'mp',cost:30});assert.equal(b.mp,20);assert.equal(b.enemyHp,hp);});
+test('basic attacks are free and rate limited independently from jutsu',()=>{const b=new Battle();b.start(0);assert.equal(b.basic('punch').damage,8);assert.equal(b.mp,100);assert.equal(b.basic('slap').reason,'cooldown');b.tick(700);assert.equal(b.basic('slap').damage,11);assert.equal(b.enemyHp,341);assert.equal(b.mp,100);});
+test('enemy telegraphs, deals damage, and every third hit is stronger',()=>{const b=new Battle();b.start(0);assert.equal(b.tick(3300)[0].type,'warning');assert.equal(b.hp,100);assert.equal(b.tick(4500)[0].damage,11);assert.equal(b.tick(9000)[0].damage,11);assert.equal(b.tick(13500)[0].damage,17);assert.equal(b.hp,61);});
+test('jutsu interrupts a pending attack and clone shield reduces the following damage',()=>{const b=new Battle();b.start(0);b.tick(3300);b.useSkill('clone');assert.equal(b.telegraphed,false);assert.deepEqual(b.tick(4500),[]);const hit=b.tick(7800)[0];assert.equal(hit.type,'enemy-hit');assert.equal(hit.shielded,true);assert.equal(hit.damage,6);});
+test('pause and resume preserve HP, MP and attack timing across long wall-clock gaps',()=>{const b=new Battle();b.start(0);b.useSkill('fire');b.tick(1000);b.pause();b.tick(60000);assert.equal(b.hp,100);assert.equal(b.mp,70);assert.equal(b.elapsed,1);assert.equal(b.useSkill('clone').ok,false);b.resume(60000);b.tick(61000);assert.equal(b.elapsed,2);assert.equal(b.mp,75);assert.equal(b.hp,100);});
+test('winning clamps enemy HP to zero and freezes all future combat and mana changes',()=>{const b=new Battle();b.start(0);b.enemyHp=3;const hit=b.useSkill('lightning');assert.equal(hit.won,true);assert.equal(hit.damage,3);assert.equal(b.enemyHp,0);assert.equal(b.status,'won');const snapshot=[b.mp,b.hp,b.elapsed];b.tick(999999);assert.deepEqual([b.mp,b.hp,b.elapsed],snapshot);assert.equal(b.basic('slap').ok,false);});
+test('player defeat freezes combat, then a new round restores resources and cooldowns',()=>{const b=new Battle();b.start(0);b.hp=2;b.tick(4500);assert.equal(b.hp,0);assert.equal(b.status,'lost');assert.equal(b.useSkill('fire').ok,false);b.start(10000,'demo');assert.deepEqual([b.hp,b.mp,b.enemyHp,b.elapsed],[100,100,360,0]);assert.equal(b.useSkill('fire').ok,true);});
+test('changing selected jutsu cannot bypass the shared skill cooldown',()=>{const b=new Battle();b.start(0);b.useSkill('fire');assert.equal(b.useSkill('clone').reason,'cooldown');assert.equal(b.mp,65);b.tick(1600);assert.equal(b.useSkill('clone').ok,true);});
+
+function hand({x=.5,y=.5,scale=1,open=false}={}){
+  const h=Array.from({length:21},()=>({x,y,z:0}));h[9]={x,y:y-.12*scale,z:0};
+  for(const [pip,tip] of [[6,8],[10,12],[14,16],[18,20]]){h[pip]={x:x+.01*scale,y:y-.16*scale,z:0};h[tip]={x:x+.01*scale,y:y-(open?.25:.08)*scale,z:0};}
+  return h;
+}
+test('a fast closed fist triggers a punch; static fists do not',()=>{const m=new MotionDetector();assert.equal(m.update([hand()],1000),null);const hit=m.update([hand({x:.63})],1100);assert.equal(hit.kind,'punch');assert.equal(m.update([hand({x:.63})],1200),null);assert.equal(m.update([hand({x:.63})],1400),null);});
+test('downward open-palm motion triggers a slap, slow motion does not',()=>{const m=new MotionDetector();m.update([hand({open:true,y:.35})],1000);assert.equal(m.update([hand({open:true,y:.48})],1100).kind,'slap');const slow=new MotionDetector();slow.update([hand({open:true,y:.35})],1000);assert.equal(slow.update([hand({open:true,y:.37})],1100),null);});
+test('stationary seals, missing frames and tiny/distant hands cannot punch',()=>{const m=new MotionDetector();for(let t=1000;t<3000;t+=100)assert.equal(m.update([hand({open:true})],t),null);m.reset();m.update([hand()],1000);assert.equal(m.update([hand({x:.9})],2000),null);m.reset();m.update([hand({scale:.1})],1000);assert.equal(m.update([hand({scale:.1,x:.9})],1100),null);assert.equal(m.update([],1200),null);});
+test('a growing fist approaching the camera can punch, not only lateral motion',()=>{const m=new MotionDetector();m.update([hand({y:.5})],1000);assert.equal(m.update([hand({y:.5,scale:1.5})],1100).kind,'punch');});
+test('all published skill prices are positive and affordable at maximum MP',()=>{for(const s of Object.values(SKILLS)){assert.ok(s.cost>0&&s.cost<=100);assert.ok(s.damage>0);}});

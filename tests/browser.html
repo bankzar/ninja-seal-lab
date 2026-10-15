@@ -1,6 +1,8 @@
 <!doctype html><html><head><title>Ninja Lab — browser verification</title></head><body style="background:#111;color:#ddd;font:15px monospace"><h1>Local browser verification</h1><pre id="results">Loading pinned MediaPipe models…</pre><canvas id="input" width="640" height="480"></canvas><canvas id="output" width="640" height="480"></canvas><script type="module">
 import {FilesetResolver,HandLandmarker,FaceLandmarker,ImageSegmenter} from '/vendor/vision_bundle.mjs';
 import {Effects} from '/effects.js';
+import {Battle} from '/battle.js';
+import {BattleScene} from '/battle-scene.js';
 const results=document.querySelector('#results'),lines=[];
 function report(s){lines.push(s);results.textContent=lines.join('\n');}
 const tasks=[];
@@ -13,6 +15,9 @@ try{
   const seg=await make(ImageSegmenter,'selfie_segmenter.tflite',{runningMode:'IMAGE',outputConfidenceMasks:true,outputCategoryMask:false});tasks.push(seg);seg.segment(input,r=>{const m=r.confidenceMasks[0],values=m.getAsFloat32Array();if(!values.length||values.some(v=>!Number.isFinite(v)))throw Error('Invalid mask');report('PASS: ImageSegmenter runs; foreground mask '+m.width+'×'+m.height);});
   const output=document.querySelector('#output'),fx=new Effects(output);
   for(const id of ['fire','clone','lightning']){fx.start(id,0,true);fx.draw(null,null,[],500);const p=output.getContext('2d').getImageData(0,0,640,480);if(!p.data.some((v,i)=>i%4===3&&v))throw Error('Empty '+id+' effect');report('PASS: '+id+' demo renders pixels');}
-  fx.draw(null,null,[],7000);if(fx.active)throw Error('Effect did not end');report('PASS: effects expire at 6 seconds');report('ALL BROWSER CHECKS PASSED');
+  fx.draw(null,null,[],7000);if(fx.active)throw Error('Effect did not end');report('PASS: effects expire at 6 seconds');
+  const battle=new Battle(),arena=new BattleScene(output);await arena.image.decode();if(!arena.image.naturalWidth)throw Error('Madara artwork failed');report('PASS: Madara RGBA artwork loads');battle.start(0,'demo');arena.draw(battle,0);
+  for(const id of ['fire','clone','lightning']){const hit=battle.useSkill(id);arena.add({type:'skill',id,damage:38},100);arena.draw(battle,500);}arena.add({type:'basic',id:'slap',damage:11},1000);arena.draw(battle,1200);report('PASS: battle arena and every attack renderer execute');
+  fx.start('fire',0,true,2.8);fx.draw(null,null,[],2900);if(fx.active)throw Error('Battle effect did not expire');report('PASS: battle jutsu effect expires at 2.8 seconds');report('ALL BROWSER CHECKS PASSED');
 }catch(e){report('FAIL: '+e.message);console.error(e);}finally{tasks.forEach(t=>t.close());}
 </script></body></html>

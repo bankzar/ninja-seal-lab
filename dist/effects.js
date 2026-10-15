@@ -1,7 +1,7 @@
 const TAU=Math.PI*2;
 export class Effects {
   constructor(canvas){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.active=null;this.clones=null;this.demo=false;}
-  start(id,now,demo=false){this.active=id;this.started=now;this.demo=demo;this.clones=null;}
+  start(id,now,demo=false,duration=6){this.active=id;this.started=now;this.demo=demo;this.duration=duration;this.clones=null;}
   clear(){this.active=null;this.clones=null;}
   draw(video,face,hands,now){
     const c=this.ctx,w=this.canvas.width,h=this.canvas.height;
@@ -10,8 +10,8 @@ export class Effects {
     else if(this.active && this.demo)this.drawDemo(w,h);
     if(!this.active)return;
     const age=(now-this.started)/1000;
-    if(age>6){this.clear();return;}
-    c.save();c.globalAlpha=Math.min(1,age*4,(6-age)*3);
+    if(age>this.duration){this.clear();return;}
+    c.save();c.globalAlpha=Math.min(1,age*4,(this.duration-age)*3);
     if(this.active==='fire'){this.eyes(face,age,w,h);this.fire(age,w,h);}
     if(this.active==='clone')this.clone(age,w,h);
     if(this.active==='lightning')this.lightning(hands,age,w,h);
