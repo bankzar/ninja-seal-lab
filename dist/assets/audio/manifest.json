@@ -13,5 +13,6 @@
     "clone": "かげぶんしんのじゅつ！",
     "lightning": "ちどり！"
   },
-  "impacts": "Original deterministic procedural synthesis in generate_audio.py"
+  "impacts": "Original deterministic procedural synthesis in generate_audio.py",
+  "slap": "slap-hard.wav: compressed palm crack with short room reflections, v2"
 }

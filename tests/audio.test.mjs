@@ -6,6 +6,7 @@ class Context {
   constructor(){this.state='suspended';this.destination={};this.created=[];}
   async resume(){this.state='running';}
   createGain(){return {gain:{value:0},connect(){},disconnect(){}};}
+  createDynamicsCompressor(){return {threshold:{},knee:{},ratio:{},attack:{},release:{},connect(){}};}
   async decodeAudioData(){return {duration:1};}
   createBufferSource(){const source={playbackRate:{value:1},connect(){},disconnect(){},start(){this.started=true;},stop(){this.stopped=true;}};this.created.push(source);return source;}
 }

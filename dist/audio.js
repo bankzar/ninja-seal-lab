@@ -1,4 +1,4 @@
-export const SOUND_FILES=Object.freeze({fire:'fire.mp3',clone:'clone.mp3',lightning:'lightning.mp3',punch:'punch.wav',slap:'slap.wav'});
+export const SOUND_FILES=Object.freeze({fire:'fire.mp3',clone:'clone.mp3',lightning:'lightning.mp3',punch:'punch.wav',slap:'slap-hard.wav'});
 const VOICES=new Set(['fire','clone','lightning']);
 
 export class GameAudio {
@@ -11,7 +11,11 @@ export class GameAudio {
   async unlock(){
     if(!this.enabled||!this.Context)return false;
     try{
-      if(!this.ctx){this.ctx=new this.Context();this.master=this.ctx.createGain();this.master.gain.value=.72;this.master.connect(this.ctx.destination);}
+      if(!this.ctx){
+        this.ctx=new this.Context();this.master=this.ctx.createGain();this.master.gain.value=.72;
+        this.limiter=this.ctx.createDynamicsCompressor();this.limiter.threshold.value=-3;this.limiter.knee.value=0;this.limiter.ratio.value=20;this.limiter.attack.value=.001;this.limiter.release.value=.08;
+        this.master.connect(this.limiter);this.limiter.connect(this.ctx.destination);
+      }
       if(this.ctx.state==='suspended')await this.ctx.resume();
       if(!this.ready){
         this.ready=Promise.allSettled(Object.entries(SOUND_FILES).map(async([id,file])=>{
@@ -37,7 +41,7 @@ export class GameAudio {
     const isVoice=VOICES.has(id);
     if(isVoice&&this.voice){try{this.voice.stop();}catch{}this.sources.delete(this.voice);}
     const source=this.ctx.createBufferSource(),gain=this.ctx.createGain();source.buffer=this.buffers.get(id);
-    gain.gain.value=Math.max(0,Math.min(1,volume))*(isVoice?1:.8);
+    gain.gain.value=Math.max(0,Math.min(1,volume))*(isVoice?1:id==='slap'?1.15:.95);
     if(!isVoice)source.playbackRate.value=.96+Math.random()*.08;
     source.connect(gain);gain.connect(this.master);this.sources.add(source);if(isVoice)this.voice=source;
     source.onended=()=>{this.sources.delete(source);if(this.voice===source)this.voice=null;source.disconnect();gain.disconnect();};

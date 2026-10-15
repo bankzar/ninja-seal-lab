@@ -2,7 +2,7 @@
 
 ## Audio
 
-Bundled in `dist/assets/audio/`: `fire.mp3` (写輪眼！火遁！), `clone.mp3` (影分身の術！), `lightning.mp3` (千鳥！), `punch.wav`, `slap.wav`. The spoken callouts were generated with Japanese voice `ja-JP-KeitaNeural` through [edge-tts](https://github.com/rany2/edge-tts); hiragana pronunciations, rate and pitch are recorded in the adjacent `manifest.json`. Impact sounds are original procedural synthesis. `generate_audio.py` reproduces preparation. The game serves these files locally; no microphone or runtime speech service is used.
+Bundled in `dist/assets/audio/`: `fire.mp3` (写輪眼！火遁！), `clone.mp3` (影分身の術！), `lightning.mp3` (千鳥！), `punch.wav`, `slap-hard.wav`. The spoken callouts were generated with Japanese voice `ja-JP-KeitaNeural` through [edge-tts](https://github.com/rany2/edge-tts); hiragana pronunciations, rate and pitch are recorded in the adjacent `manifest.json`. Impact sounds are original procedural synthesis. The v2 slap has a sharper transient, denser smack and short room reflections, with a louder mix and output compression. `generate_audio.py` reproduces preparation; `--impacts-only` keeps the Japanese voice recordings. The game serves these files locally; no microphone or runtime speech service is used.
 
 ## Madara illustration
 

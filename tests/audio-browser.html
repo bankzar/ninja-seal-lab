@@ -9,7 +9,7 @@ document.querySelector('#run').onclick=async()=>{
     report('PASS: AudioContext running after click');
     for(const id of Object.keys(SOUND_FILES)){
       const b=audio.buffers.get(id),samples=b.getChannelData(0);let power=0,peak=0;for(const x of samples){power+=x*x;peak=Math.max(peak,Math.abs(x));}
-      if(b.duration<.05||power/samples.length<.000001||peak>=1)throw Error('Silent, invalid, or clipped asset: '+id);
+      if(b.duration<.05||power/samples.length<.000001||peak>=1)throw Error('Silent, invalid, or clipped asset: '+id+'; peak '+peak.toFixed(3));
       report('PASS: '+id+' decodes; '+b.duration.toFixed(2)+'s, RMS '+Math.sqrt(power/samples.length).toFixed(3)+', peak '+peak.toFixed(3));
     }
     if(!await audio.play('fire'))throw Error('Callout did not start');report('PASS: Japanese callout starts');
