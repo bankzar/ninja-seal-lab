@@ -2,9 +2,16 @@ import {SEALS,JUTSUS,SealSequence,classify,sealArt} from './seals.js';
 import {Effects} from './effects.js';
 import {Battle,MotionDetector,SKILLS} from './battle.js';
 import {BattleScene} from './battle-scene.js';
+import {GameAudio} from './audio.js';
 const $=id=>document.getElementById(id);
 const video=$('video'), canvas=$('scene'), effects=new Effects(canvas);
 const battle=new Battle(),motion=new MotionDetector(),arena=new BattleScene($('enemy-scene'),{resizeToParent:true});
+const sound=new GameAudio();
+function updateSoundButton(){const button=$('sound-toggle');button.textContent=sound.enabled?'🔊 เสียงเปิด':'🔇 ปิดเสียง';button.setAttribute('aria-pressed',String(sound.enabled));button.title=sound.enabled?'ปิดเสียงวิชาและเสียงปะทะ':'เปิดเสียงวิชาและเสียงปะทะ';}
+$('sound-toggle').addEventListener('click',()=>{sound.setEnabled(!sound.enabled);updateSoundButton();if(sound.enabled)void sound.unlock();});
+document.addEventListener('pointerdown',()=>{void sound.unlock();},{once:true});
+document.addEventListener('keydown',()=>{void sound.unlock();},{once:true});
+updateSoundButton();
 let combatLog=[],hitFlashUntil=0,lastHud=0;
 canvas.width=960;canvas.height=720;
 let selected=JUTSUS[0], sequence=new SealSequence(selected.sequence), models=null, modelPromise=null;
@@ -37,6 +44,7 @@ function renderBattle(){
   if(ended){$('battle-result').classList.toggle('lost',battle.status==='lost');$('result-en').textContent=battle.status==='won'?'VICTORY':'DEFEAT';$('result-title').textContent=battle.status==='won'?'ชนะมาดาระ!':'ครั้งหน้าเอาใหม่';$('result-stats').textContent=`${demo?'DEMO · ':''}เวลา ${$('battle-time').textContent} · โจมตี ${battle.hits} ครั้ง · รวม ${battle.damage} ดาเมจ`;}
 }
 function startBattle(mode=battle.mode){
+  void sound.unlock();
   if(mode==='camera'&&!running){notify('เปิดกล้องให้พร้อมก่อนเริ่มต่อสู้');return;}
   reset(false);motion.reset();
   if(battle.status==='paused'&&mode===battle.mode){battle.resume(performance.now());logCombat('กลับเข้าสู่การต่อสู้');}
@@ -56,6 +64,7 @@ function hitEnemy(attack){
 }
 function basicAttack(kind){
   const attack=battle.basic(kind);if(!hitEnemy(attack))return;
+  void sound.play(kind);
   if(!attack.won)notify((kind==='punch'?'✊ ต่อย':'✋ ฟาดหัว')+` โดนมาดาระ −${attack.damage} HP`);
   sequence=new SealSequence(selected.sequence);renderSeals();
 }
@@ -66,7 +75,7 @@ $('battle-retry').addEventListener('click',()=>startBattle(battle.mode));
 $('demo-controls').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||battle.mode!=='demo'||battle.status!=='active')return;if(b.dataset.basic)basicAttack(b.dataset.basic);else if(b.dataset.skill)demoSkill(b.dataset.skill);});
 function demoSkill(id){selected=JUTSUS.find(j=>j.id===id);reset(false);renderJutsus();cast(false,true);}
 document.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.metaKey||e.altKey||battle.mode!=='demo'||battle.status!=='active'||$('guide').open||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;const key=e.key.toLowerCase();if(key==='z'||key==='x'){e.preventDefault();basicAttack(key==='z'?'punch':'slap');}if(['1','2','3'].includes(key)){e.preventDefault();demoSkill(JUTSUS[Number(key)-1].id);}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseBattle('พักอัตโนมัติเมื่อออกจากหน้าต่าง กดสู้ต่อเมื่อกลับมา');});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){sound.stop();pauseBattle('พักอัตโนมัติเมื่อออกจากหน้าต่าง กดสู้ต่อเมื่อกลับมา');}});
 function renderJutsus(){
   $('jutsu-list').innerHTML=JUTSUS.map((j,i)=>`<button class="jutsu-card ${selected.id===j.id?'active':''}" data-jutsu="${j.id}" aria-pressed="${selected.id===j.id}"><div class="card-top"><span class="jutsu-symbol">${j.symbol}</span><span class="jutsu-number">0${i+1} ${selected.id===j.id?'↗':''}</span></div><h3>${j.name}</h3><span class="english">${j.en}</span><p>${j.description}</p><div class="card-sequence">${j.sequence.map(s=>SEALS[s].name).join('<i>→</i>')}</div><div class="skill-price"><b>${SKILLS[j.id].cost} MP</b><span>−${SKILLS[j.id].damage} HP${j.id==='clone'?' + ป้องกัน':''}</span></div></button>`).join('');
 }
@@ -74,7 +83,7 @@ function renderSeals(){
   $('sequence-counter').textContent=`${Math.min(3,sequence.index)} / 3`;
   $('seal-list').innerHTML=selected.sequence.map((id,i)=>`<div class="seal-row ${i===sequence.index?'current':''} ${i<sequence.index?'complete':''}"><span class="seal-step">${i<sequence.index?'✓':i+1}</span>${sealArt(id)}<div class="seal-info"><h3>${SEALS[id].name}</h3><small>${SEALS[id].en}</small><p>${SEALS[id].instruction}</p><button class="learn-button" data-learn="${id}" title="จดจำท่ามือของคุณ">${templates[id]?'✓ ฝึกแล้ว · ฝึกใหม่':'＋ ฝึกท่านี้'}</button></div></div>`).join('');
 }
-function reset(message=true){castGeneration++;sequence=new SealSequence(selected.sequence);effects.clear();calibration=null;$('cast-banner').hidden=true;$('welcome').hidden=!!stream||(battle.mode==='demo'&&battle.status!=='idle');renderSeals();if(message)notify('เริ่มอินใหม่: '+selected.sequence.map(s=>SEALS[s].name).join(' → '));}
+function reset(message=true){sound.stop();castGeneration++;sequence=new SealSequence(selected.sequence);effects.clear();calibration=null;$('cast-banner').hidden=true;$('welcome').hidden=!!stream||(battle.mode==='demo'&&battle.status!=='idle');renderSeals();if(message)notify('เริ่มอินใหม่: '+selected.sequence.map(s=>SEALS[s].name).join(' → '));}
 $('jutsu-list').addEventListener('click',e=>{const b=e.target.closest('[data-jutsu]');if(!b)return;selected=JUTSUS.find(j=>j.id===b.dataset.jutsu);reset();renderJutsus();});
 $('seal-list').addEventListener('click',e=>{const b=e.target.closest('[data-learn]');if(!b)return;if(!running){notify('เปิดกล้องก่อน แล้วค่อยฝึกท่ามือของคุณ');return;}pauseBattle();calibration={id:b.dataset.learn,until:performance.now()+3000,samples:[]};effects.clear();notify('ทำท่า '+SEALS[calibration.id].name+' ให้เห็นทั้งสองมือ แล้วค้างไว้ 3 วินาที…');});
 $('threshold').addEventListener('input',e=>{$('threshold-label').value=e.target.value+'%';sequence.candidate=null;});
@@ -101,6 +110,7 @@ async function loadModels(){
   try{return await modelPromise;}finally{modelPromise=null;}
 }
 async function startCamera(){
+  void sound.unlock();
   if(loading||running)return;const ownSession=++session;loading=true;
   const button=$('camera-start');button.disabled=true;button.textContent='กำลังเปิดกล้อง…';$('camera-stop').disabled=false;
   notify('กำลังขอใช้กล้องและโหลดระบบตรวจมือกับใบหน้า ครั้งแรกอาจใช้เวลาสักครู่');
@@ -162,6 +172,7 @@ async function cast(demo=false,battleDemo=false){
   }
   const generation=++castGeneration;
   effects.start(selected.id,performance.now(),demo||battleDemo,battle.status==='active'||battle.status==='won'?2.8:6);const jutsu=selected;
+  void sound.play(jutsu.id);
   if(demo&&!stream){$('welcome').hidden=true;$('stage-message').textContent='EFFECT PREVIEW · DEMO AVATAR';}
   $('cast-banner').innerHTML=`<small>${demo?'EFFECT PREVIEW':'JUTSU ACTIVATED'}</small><strong>${jutsu.name}</strong><em>${jutsu.en}</em>`;$('cast-banner').hidden=false;
   if(!demo){count++;$('cast-count').textContent=String(count).padStart(2,'0');if(battle.status!=='won')notify('สำเร็จ! '+jutsu.name+(battle.status==='active'?` · ใช้ ${SKILLS[jutsu.id].cost} MP · มาดาระ −${SKILLS[jutsu.id].damage} HP`:' · ทดลองวิชานอก Battle'));}
@@ -206,7 +217,7 @@ function detect(now){
 }
 function frame(now){
   for(const event of battle.tick(now)){
-    if(event.type==='enemy-hit'){arena.add(event,now);hitFlashUntil=now+450;logCombat(`มาดาระ${event.strong?'ใช้หมัดหนัก':'โจมตี'} −${event.damage} HP${event.shielded?' · แยกร่างลดดาเมจ':''}`,true);}
+    if(event.type==='enemy-hit'){void sound.play('punch',{volume:.55});arena.add(event,now);hitFlashUntil=now+450;logCombat(`มาดาระ${event.strong?'ใช้หมัดหนัก':'โจมตี'} −${event.damage} HP${event.shielded?' · แยกร่างลดดาเมจ':''}`,true);}
     if(event.type==='lost'){sequence=new SealSequence(selected.sequence);renderSeals();notify('HP หมดแล้ว มาดาระชนะรอบนี้ กดสู้ใหม่เพื่อลองอีกครั้ง');}
   }
   if(running&&video.readyState>=2&&now-lastInference>100&&video.currentTime!==lastVideoTime){lastInference=now;lastVideoTime=video.currentTime;detect(now);}
@@ -217,5 +228,5 @@ function frame(now){
   if(now-lastHud>100){lastHud=now;renderBattle();}
   requestAnimationFrame(frame);
 }
-window.addEventListener('pagehide',()=>{stream?.getTracks().forEach(t=>t.stop());Object.values(models||{}).forEach(m=>m.close());});
+window.addEventListener('pagehide',()=>{sound.stop();stream?.getTracks().forEach(t=>t.stop());Object.values(models||{}).forEach(m=>m.close());});
 renderJutsus();renderSeals();renderBattle();requestAnimationFrame(frame);

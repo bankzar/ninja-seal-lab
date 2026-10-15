@@ -1,0 +1,22 @@
+<!doctype html><html><head><title>Ninja Lab audio verification</title></head><body style="background:#151910;color:#ddd;font:14px monospace"><h1>Audio verification</h1><button id="run">ทดสอบเสียงญี่ปุ่นและเสียงปะทะ</button><pre id="results">Click to unlock audio.</pre><script type="module">
+import {GameAudio,SOUND_FILES} from '/audio.js';
+const audio=new GameAudio({storage:{getItem(){return null;},setItem(){}}}),out=document.querySelector('#results');
+const report=s=>out.textContent+='\n'+s;
+document.querySelector('#run').onclick=async()=>{
+  out.textContent='Testing real browser audio…';
+  try{
+    if(!await audio.unlock())throw Error('Audio state '+audio.ctx?.state+'; '+audio.buffers.size+' buffers; '+audio.failures.join(' | '));
+    report('PASS: AudioContext running after click');
+    for(const id of Object.keys(SOUND_FILES)){
+      const b=audio.buffers.get(id),samples=b.getChannelData(0);let power=0,peak=0;for(const x of samples){power+=x*x;peak=Math.max(peak,Math.abs(x));}
+      if(b.duration<.05||power/samples.length<.000001||peak>=1)throw Error('Silent, invalid, or clipped asset: '+id);
+      report('PASS: '+id+' decodes; '+b.duration.toFixed(2)+'s, RMS '+Math.sqrt(power/samples.length).toFixed(3)+', peak '+peak.toFixed(3));
+    }
+    if(!await audio.play('fire'))throw Error('Callout did not start');report('PASS: Japanese callout starts');
+    if(!await audio.play('slap'))throw Error('Slap did not start');report('PASS: impact can layer with speech');
+    audio.setEnabled(false);if(audio.sources.size)throw Error('Mute did not stop audio');if(await audio.play('punch'))throw Error('Muted impact played');report('PASS: mute stops and suppresses audio');
+    audio.setEnabled(true);if(!await audio.play('lightning'))throw Error('Unmute failed');report('PASS: unmute and second Japanese callout play');
+    report('ALL AUDIO CHECKS PASSED');
+  }catch(e){report('FAIL: '+e.message);console.error(e);}
+};
+</script></body></html>

@@ -1,0 +1,17 @@
+{
+  "voice": "ja-JP-KeitaNeural",
+  "generator": "edge-tts 7.3.1",
+  "rate": "+15%",
+  "pitch": "-12Hz",
+  "callouts": {
+    "fire": "写輪眼！火遁！",
+    "clone": "影分身の術！",
+    "lightning": "千鳥！"
+  },
+  "spoken": {
+    "fire": "しゃりんがん！かとん！",
+    "clone": "かげぶんしんのじゅつ！",
+    "lightning": "ちどり！"
+  },
+  "impacts": "Original deterministic procedural synthesis in generate_audio.py"
+}
